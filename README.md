@@ -1,4 +1,4 @@
-# 🏠 Rent Ledger Microservices System
+# 🏠 Rent Ledger System
 
 A production-grade Rent Ledger Application built using **FastAPI**, **PostgreSQL**, and **Docker**. The application features a architecture that separates core ledger operations from mock payment processing gateways, complete with a dynamic Bootstrap-based web dashboard.
 
