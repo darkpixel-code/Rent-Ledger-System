@@ -16,7 +16,7 @@ The Rent Ledger System automates property ledger management, invoicing, and tena
 ## 🔗 Quick Access & Setup
 
 * **Dashboard URL:** http://localhost:8000/
-* **Git Clone Command:** `git clone <repository-url> && cd rent-ledger-system`
+* **Git Clone Command:** `git clone https://github.com/darkpixel-code/Rent-Ledger-System.git`
 * **Docker Run Command:** `docker compose up --build -d`
 * **Docker View Logs:** `docker compose logs -f`
 * **Docker Stop Command:** `docker compose down`
