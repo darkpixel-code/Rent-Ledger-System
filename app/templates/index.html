@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Rent Ledger System</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{background:#f4f7fb!important;color:#212529}
+.card{border:1px solid #dee5ef;border-radius:10px}
+.card-header{border-radius:9px 9px 0 0!important}
+
+.action-purple{background:#6f42c1!important;color:#fff}
+.btn-purple{background:#6f42c1;border-color:#6f42c1;color:#fff}
+.btn-purple:hover{background:#59339d;border-color:#59339d;color:#fff}
+
+.search-dropdown{position:relative}
+.search-trigger{width:100%;height:38px;background:#fff;border:1px solid #ced4da;border-radius:6px;padding:6px 38px 6px 12px;text-align:left;color:#495057;cursor:pointer;position:relative}
+.search-trigger:hover,.search-trigger:focus{border-color:#86b7fe}
+.search-trigger:focus{box-shadow:0 0 0 .2rem rgba(13,110,253,.15);outline:0}
+.search-trigger .arrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#6c757d}
+.search-menu{display:none;position:absolute;z-index:1050;top:calc(100% + 4px);left:0;width:100%;background:#fff;border:1px solid #ced4da;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);overflow:hidden}
+.search-menu.show{display:block}
+.search-box-wrap{padding:8px;background:#f8f9fa;border-bottom:1px solid #dee2e6}
+.search-box{width:100%;border:1px solid #ced4da;border-radius:6px;padding:7px 10px;outline:0}
+.search-box:focus{border-color:#0d6efd;box-shadow:0 0 0 .15rem rgba(13,110,253,.12)}
+.search-options{max-height:220px;overflow-y:auto}
+.search-option{padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.94rem}
+.search-option:hover{background:#eaf3ff;color:#0d6efd}
+.search-option.selected{background:#0d6efd;color:#fff;font-weight:600}
+.search-empty{padding:12px;text-align:center;color:#6c757d;font-size:.9rem}
+
+.upi-badge{cursor:pointer;font-size:.8rem;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid #ced4da;background:#f8f9fa;user-select:none}
+.upi-badge:hover,.upi-badge.active{border-color:#0d6efd;background:#e7f1ff;color:#0d6efd}
+.statement-summary{border-radius:8px}
+.table>thead th{white-space:nowrap}
+.action-card .card-header{font-weight:600}
+</style>
+</head>
+
+<body>
+<div class="container my-4">
+
+<h2 class="text-center mb-4 fw-bold">🏠 Rent Ledger System</h2>
+
+{% if error_msg %}
+<div class="alert alert-danger shadow-sm">{{ error_msg }}</div>
+{% endif %}
+
+<!-- SEARCH LEDGER -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+<h5 class="mb-0">🔍 Search Ledger Statement</h5>
+<button class="btn btn-light text-primary btn-sm fw-bold" onclick="fetchTenants()">📋 View All Tenants</button>
+</div>
+
+<div class="card-body">
+<form class="row g-3" onsubmit="return fetchStatement(event)">
+
+<div class="col-md-3">
+<label class="form-label fw-semibold">House ID</label>
+<div class="search-dropdown">
+<button type="button" class="search-trigger" onclick="toggleDropdown('house')">
+<span id="house_selected_text">Select House ID</span><span class="arrow">▼</span>
+</button>
+
+<div class="search-menu" id="house_menu">
+<div class="search-box-wrap">
+<input type="text" class="search-box" id="house_search" placeholder="🔍 Search House ID..." autocomplete="off" oninput="filterOptions('house')">
+</div>
+<div class="search-options" id="house_options"></div>
+</div>
+</div>
+
+<input type="hidden" id="search_house_id">
+</div>
+
+<div class="col-md-4">
+<label class="form-label fw-semibold">Owner Name</label>
+
+<div class="search-dropdown">
+<button type="button" class="search-trigger" onclick="toggleDropdown('owner')">
+<span id="owner_selected_text">Select Owner Name</span><span class="arrow">▼</span>
+</button>
+
+<div class="search-menu" id="owner_menu">
+<div class="search-box-wrap">
+<input type="text" class="search-box" id="owner_search" placeholder="🔍 Search Owner Name..." autocomplete="off" oninput="filterOptions('owner')">
+</div>
+<div class="search-options" id="owner_options"></div>
+</div>
+</div>
+
+<input type="hidden" id="search_owner_name">
+</div>
+
+<div class="col-md-3">
+<label class="form-label fw-semibold">As of Date</label>
+<input type="date" id="search_as_of" class="form-control" required>
+</div>
+
+<div class="col-md-2 d-flex align-items-end">
+<button type="submit" class="btn btn-primary w-100 fw-semibold">Get Ledger</button>
+</div>
+
+</form>
+</div>
+</div>
+
+<!-- STATEMENT -->
+<div id="statement_card" class="card mb-4 shadow d-none">
+
+<div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+<h5 class="mb-0" id="statement_title">Statement</h5>
+
+<div>
+<span class="badge bg-light text-dark me-3 fs-6" id="statement_owner"></span>
+<span><strong>As Of Date:</strong> <span id="statement_date"></span></span>
+</div>
+</div>
+
+<div class="card-body">
+
+<div class="row text-center mb-3">
+
+<div class="col-md-4">
+<div class="p-3 border bg-light rounded statement-summary">
+<small class="text-muted fw-semibold">Total Invoiced</small>
+<h4 class="text-primary mb-0" id="total_invoiced">₹0</h4>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="p-3 border bg-light rounded statement-summary">
+<small class="text-muted fw-semibold">Total Received</small>
+<h4 class="text-success mb-0" id="payment_received">₹0</h4>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="p-3 border bg-light rounded statement-summary">
+<small class="text-muted fw-semibold">Outstanding Balance</small>
+<h4 class="text-danger mb-0" id="outstanding_balance">₹0</h4>
+</div>
+</div>
+
+</div>
+
+<div class="table-responsive">
+<table class="table table-bordered table-striped align-middle">
+<thead class="table-dark">
+<tr>
+<th>Date</th>
+<th>Type</th>
+<th>Description</th>
+<th>Amount (₹)</th>
+<th>Running Balance (₹)</th>
+</tr>
+</thead>
+
+<tbody id="statement_body"></tbody>
+</table>
+</div>
+
+</div>
+</div>
+
+<hr class="my-4">
+
+<!-- ACTION CARDS -->
+<div class="row g-4">
+
+<!-- REGISTER HOUSE -->
+<div class="col-md-4">
+<div class="card h-100 shadow-sm action-card">
+
+<div class="card-header action-purple">
+<h6 class="mb-0">1. Register House</h6>
+</div>
+
+<div class="card-body">
+<form action="/register-house" method="POST">
+
+<div class="mb-2">
+<label class="form-label">House ID</label>
+<input type="text" name="house_id" class="form-control" placeholder="H-101" required>
+</div>
+
+<div class="mb-2">
+<label class="form-label">Owner Name</label>
+<input type="text" name="owner_name" class="form-control" required>
+</div>
+
+<div class="mb-3">
+<label class="form-label">Monthly Rent (₹)</label>
+<input type="text" name="monthly_rent" class="form-control" placeholder="e.g. 5000" required>
+</div>
+
+<button type="submit" class="btn btn-purple w-100 fw-semibold">Register</button>
+
+</form>
+</div>
+</div>
+</div>
+
+<!-- GENERATE INVOICE -->
+<div class="col-md-4">
+<div class="card h-100 shadow-sm action-card">
+
+<div class="card-header action-purple">
+<h6 class="mb-0">2. Generate Invoice</h6>
+</div>
+
+<div class="card-body">
+<form action="/generate-invoice" method="POST">
+
+<div class="mb-2">
+<label class="form-label">House ID</label>
+<input type="text" name="house_id" class="form-control" required>
+</div>
+
+<div class="mb-2">
+<label class="form-label">Electric Units</label>
+<input type="text" name="electric_units" class="form-control" placeholder="e.g. 150" required>
+</div>
+
+<div class="mb-2">
+<label class="form-label">Water Bill (₹)</label>
+<input type="text" name="water_bill" class="form-control" placeholder="e.g. 300" required>
+</div>
+
+<div class="mb-2">
+<label class="form-label">Created Date</label>
+<input type="date" name="created_date" class="form-control" required>
+</div>
+
+<div class="form-check mb-2">
+<input type="checkbox" name="is_quarterly_month" value="true" class="form-check-input" id="is_quarterly" onchange="toggleMaintenance(this)">
+<label class="form-check-label fw-bold" for="is_quarterly">Include Maintenance</label>
+</div>
+
+<div class="mb-3" id="maintenance_container" style="display:none">
+<label class="form-label">Maintenance Amount (₹)</label>
+<input type="text" name="maintenance" id="maintenance_input" value="0.00" class="form-control">
+</div>
+
+<button type="submit" class="btn btn-purple w-100 fw-semibold">Generate Invoice</button>
+
+</form>
+</div>
+</div>
+</div>
+
+<!-- PROCESS PAYMENT -->
+<div class="col-md-4">
+<div class="card h-100 shadow-sm action-card">
+
+<div class="card-header action-purple">
+<h6 class="mb-0">3. Process Payment</h6>
+</div>
+
+<div class="card-body">
+<form action="/payments" method="POST">
+
+<div class="mb-2">
+<label class="form-label">House ID</label>
+<input type="text" name="house_id" class="form-control" required>
+</div>
+
+<div class="mb-2">
+<label class="form-label">Amount Paid (₹)</label>
+<input type="text" name="amount" class="form-control" placeholder="e.g. 2000" required>
+</div>
+
+<div class="mb-2">
+<label class="form-label">Payment Method</label>
+<select name="payment_method" class="form-select" onchange="updatePaymentUI(this.value)">
+<option value="UPI">UPI (Google Pay / PhonePe / Paytm / BHIM)</option>
+<option value="CARD">Credit / Debit Card</option>
+<option value="NET_BANKING">Net Banking</option>
+</select>
+</div>
+
+<div id="section_upi">
+
+<label class="form-label text-muted small">Select Preferred App:</label>
+
+<div class="d-flex flex-wrap gap-1 mb-2">
+<span class="upi-badge active" onclick="selectApp(this,'gpay')">🌐 Google Pay</span>
+<span class="upi-badge" onclick="selectApp(this,'phonepe')">🟣 PhonePe</span>
+<span class="upi-badge" onclick="selectApp(this,'paytm')">🔵 Paytm</span>
+<span class="upi-badge" onclick="selectApp(this,'bhim')">🟢 BHIM</span>
+</div>
+
+<div class="mb-2">
+<label class="form-label">UPI ID</label>
+<input type="text" name="upi_id" id="upi_id_input" class="form-control" placeholder="e.g. user@okaxis">
+</div>
+
+</div>
+
+<div id="section_card" style="display:none">
+
+<div class="mb-2">
+<label class="form-label">Card Number</label>
+<input type="text" name="card_number" class="form-control" placeholder="4532 XXXX XXXX 1234">
+</div>
+
+<div class="row g-2 mb-2">
+
+<div class="col-6">
+<label class="form-label">Expiry</label>
+<input type="text" class="form-control" placeholder="MM/YY">
+</div>
+
+<div class="col-6">
+<label class="form-label">CVV</label>
+<input type="password" maxlength="3" class="form-control" placeholder="123">
+</div>
+
+</div>
+</div>
+
+<div id="section_netbanking" style="display:none" class="mb-2">
+
+<label class="form-label">Select Bank</label>
+
+<select class="form-select">
+<option>HDFC Bank</option>
+<option>State Bank of India (SBI)</option>
+<option>ICICI Bank</option>
+<option>Axis Bank</option>
+</select>
+
+</div>
+
+<div class="mb-2">
+<label class="form-label">Payment Date</label>
+<input type="date" name="payment_date" class="form-control" required>
+</div>
+
+<div class="p-2 mb-3 bg-light border border-danger rounded">
+
+<div class="form-check">
+<input class="form-check-input" type="checkbox" name="simulate_fail" value="true" id="simulate_fail">
+<label class="form-check-label text-danger fw-bold" for="simulate_fail">
+Simulate Failure (Test Fail Flow)
+</label>
+</div>
+
+</div>
+
+<button type="submit" class="btn btn-purple w-100 fw-semibold">Submit Payment</button>
+
+</form>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<!-- TENANTS MODAL -->
+<div class="modal fade" id="tenantsModal" tabindex="-1">
+
+<div class="modal-dialog modal-lg">
+
+<div class="modal-content">
+
+<div class="modal-header bg-primary text-white">
+<h5 class="modal-title">📋 Registered Tenants Summary</h5>
+<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+</div>
+
+<div class="modal-body">
+
+<div class="table-responsive">
+
+<table class="table table-hover table-bordered align-middle">
+
+<thead class="table-dark">
+<tr>
+<th>House ID</th>
+<th>Owner Name</th>
+<th>Pending Payment (₹)</th>
+<th>Last Payment Date</th>
+</tr>
+</thead>
+
+<tbody id="tenants_table_body"></tbody>
+
+</table>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+let tenantSearchData=[];
+
+async function loadTenantSearchData(){
+try{
+const r=await fetch('/tenants');
+if(!r.ok)throw new Error('Unable to load tenant data.');
+tenantSearchData=await r.json();
+renderOptions('house');
+renderOptions('owner');
+}catch(e){
+console.error('Tenant dropdown error:',e);
+}
+}
+
+function renderOptions(type,search=''){
+const box=document.getElementById(type==='house'?'house_options':'owner_options');
+const current=document.getElementById(type==='house'?'search_house_id':'search_owner_name').value;
+const key=type==='house'?'house_id':'owner_name';
+const text=search.toLowerCase().trim();
+
+box.innerHTML='';
+
+const list=tenantSearchData.filter(t=>
+String(t[key]).toLowerCase().includes(text)
+);
+
+if(!list.length){
+box.innerHTML='<div class="search-empty">No matching records found.</div>';
+return;
+}
+
+list.forEach(t=>{
+const o=document.createElement('div');
+
+o.className='search-option';
+o.textContent=t[key];
+
+if(current===t[key])
+o.classList.add('selected');
+
+o.onclick=()=>selectTenant(t);
+
+box.appendChild(o);
+});
+}
+
+function filterOptions(type){
+renderOptions(
+type,
+document.getElementById(type+'_search').value
+);
+}
+
+function toggleDropdown(type){
+
+const menu=document.getElementById(type+'_menu');
+
+document.querySelectorAll('.search-menu').forEach(m=>{
+if(m!==menu)
+m.classList.remove('show');
+});
+
+menu.classList.toggle('show');
+
+if(menu.classList.contains('show')){
+
+const input=document.getElementById(type+'_search');
+
+input.value='';
+renderOptions(type);
+
+setTimeout(()=>input.focus(),50);
+}
+}
+
+function selectTenant(t){
+
+document.getElementById('search_house_id').value=t.house_id;
+document.getElementById('search_owner_name').value=t.owner_name;
+
+document.getElementById('house_selected_text').textContent=t.house_id;
+document.getElementById('owner_selected_text').textContent=t.owner_name;
+
+closeDropdowns();
+}
+
+function closeDropdowns(){
+document.querySelectorAll('.search-menu').forEach(m=>{
+m.classList.remove('show');
+});
+}
+
+/*
+ * Global click handler:
+ * 1. Closes search dropdowns when clicking outside them.
+ * 2. Closes the displayed ledger statement when clicking anywhere
+ *    outside the statement itself.
+ */
+document.addEventListener('click',e=>{
+
+if(!e.target.closest('.search-dropdown')){
+closeDropdowns();
+}
+
+const statement=document.getElementById('statement_card');
+
+if(
+!statement.classList.contains('d-none') &&
+!e.target.closest('#statement_card')
+){
+statement.classList.add('d-none');
+}
+
+});
+
+function closeStatement(){
+document.getElementById('statement_card').classList.add('d-none');
+}
+
+function resetLedgerSearch(){
+
+document.getElementById('search_house_id').value='';
+document.getElementById('search_owner_name').value='';
+document.getElementById('search_as_of').value='';
+
+document.getElementById('house_selected_text').textContent='Select House ID';
+document.getElementById('owner_selected_text').textContent='Select Owner Name';
+
+document.getElementById('house_search').value='';
+document.getElementById('owner_search').value='';
+
+closeDropdowns();
+}
+
+function toggleMaintenance(c){
+
+const box=document.getElementById('maintenance_container');
+const input=document.getElementById('maintenance_input');
+
+box.style.display=c.checked?'block':'none';
+input.value=c.checked?'500.00':'0.00';
+}
+
+function updatePaymentUI(method){
+
+document.getElementById('section_upi').style.display=
+method==='UPI'?'block':'none';
+
+document.getElementById('section_card').style.display=
+method==='CARD'?'block':'none';
+
+document.getElementById('section_netbanking').style.display=
+method==='NET_BANKING'?'block':'none';
+}
+
+function selectApp(el,app){
+
+document.querySelectorAll('.upi-badge').forEach(x=>{
+x.classList.remove('active');
+});
+
+el.classList.add('active');
+
+const input=document.getElementById('upi_id_input');
+
+const placeholders={
+gpay:'user@okaxis',
+phonepe:'user@ybl',
+paytm:'user@paytm',
+bhim:'user@upi'
+};
+
+input.placeholder=placeholders[app];
+}
+
+/*
+ * Get Ledger calls the backend API.
+ * This request remains visible in browser DevTools > Network.
+ */
+async function fetchStatement(event){
+
+event.preventDefault();
+
+let houseId=
+document.getElementById('search_house_id').value.trim();
+
+let ownerName=
+document.getElementById('search_owner_name').value.trim();
+
+const asOf=
+document.getElementById('search_as_of').value;
+
+if(!asOf){
+alert('Please select As of Date.');
+return false;
+}
+
+if(!houseId&&!ownerName){
+alert('Please select either House ID or Owner Name to search.');
+return false;
+}
+
+let tenant;
+
+if(houseId){
+
+tenant=tenantSearchData.find(t=>
+String(t.house_id).toLowerCase()===houseId.toLowerCase()
+);
+
+if(!tenant){
+alert('House ID not found. Please select a valid House ID.');
+return false;
+}
+
+houseId=tenant.house_id;
+ownerName=tenant.owner_name;
+
+document.getElementById('search_house_id').value=houseId;
+document.getElementById('search_owner_name').value=ownerName;
+
+}else{
+
+tenant=tenantSearchData.find(t=>
+String(t.owner_name).toLowerCase()===ownerName.toLowerCase()
+);
+
+if(!tenant){
+alert('Owner Name not found. Please select a valid Owner Name.');
+return false;
+}
+
+houseId=tenant.house_id;
+ownerName=tenant.owner_name;
+}
+
+const url=
+`/tenants/${encodeURIComponent(houseId)}/statement?asOf=${encodeURIComponent(asOf)}`;
+
+try{
+
+const r=await fetch(url);
+const data=await r.json();
+
+if(!r.ok)
+throw new Error(data.detail||'Unable to fetch statement.');
+
+if(data.house_id&&data.house_id!==houseId)
+throw new Error('House ID mismatch returned by server.');
+
+if(data.owner_name&&data.owner_name!==ownerName)
+throw new Error('Owner Name does not match the selected House ID.');
+
+renderStatement(data);
+
+resetLedgerSearch();
+
+}catch(e){
+alert(e.message);
+}
+
+return false;
+}
+
+function renderStatement(data){
+
+document.getElementById('statement_title').textContent=
+`Statement for ${data.house_id}`;
+
+document.getElementById('statement_owner').textContent=
+`👤 Owner: ${data.owner_name}`;
+
+document.getElementById('statement_date').textContent=
+data.as_of_date;
+
+document.getElementById('total_invoiced').textContent=
+`₹${Number(data.total_money_to_be_paid).toFixed(2)}`;
+
+document.getElementById('payment_received').textContent=
+`₹${Number(data.payment_received).toFixed(2)}`;
+
+document.getElementById('outstanding_balance').textContent=
+`₹${Number(data.outstanding_balance).toFixed(2)}`;
+
+const tbody=document.getElementById('statement_body');
+
+tbody.innerHTML='';
+
+if(!data.statement?.length){
+
+tbody.innerHTML=
+'<tr><td colspan="5" class="text-center text-muted">No statement entries found.</td></tr>';
+
+}else{
+
+data.statement.forEach(item=>{
+
+let badgeClass='bg-primary';
+let badgeText=item.type;
+
+if(item.type==='PAYMENT')
+badgeClass='bg-success';
+
+else if(item.type==='PENALTY')
+badgeClass='bg-warning text-dark';
+
+else if(item.type==='PAYMENT_FAILED'){
+
+badgeClass='bg-danger';
+badgeText='FAILED';
+
+}
+
+const rowClass=
+item.type==='PAYMENT_FAILED'?'table-danger':'';
+
+tbody.innerHTML+=`
+
+<tr class="${rowClass}">
+<td>${item.date}</td>
+<td><span class="badge ${badgeClass}">${badgeText}</span></td>
+<td>${item.description}</td>
+<td>₹${Number(item.amount).toFixed(2)}</td>
+<td><strong>₹${Number(item.running_balance).toFixed(2)}</strong></td>
+</tr>
+
+`;
+
+});
+}
+
+document.getElementById('statement_card').classList.remove('d-none');
+}
+
+async function fetchTenants(){
+
+try{
+
+const r=await fetch('/tenants');
+
+if(!r.ok)
+throw new Error('Unable to fetch tenants.');
+
+const data=await r.json();
+
+const tbody=
+document.getElementById('tenants_table_body');
+
+tbody.innerHTML='';
+
+if(!data.length){
+
+tbody.innerHTML=
+'<tr><td colspan="4" class="text-center text-muted">No tenants registered yet.</td></tr>';
+
+}else{
+
+data.forEach(t=>{
+
+const pending=t.pending_payment>0;
+
+tbody.innerHTML+=`
+
+<tr>
+<td><strong>${t.house_id}</strong></td>
+<td>${t.owner_name}</td>
+<td>
+<span class="badge ${pending?'bg-danger':'bg-success'} fs-6">
+₹${Number(t.pending_payment).toFixed(2)}
+</span>
+</td>
+<td><strong>${t.last_payment_date||'N/A'}</strong></td>
+</tr>
+
+`;
+
+});
+}
+
+new bootstrap.Modal(
+document.getElementById('tenantsModal')
+).show();
+
+}catch(e){
+
+alert('Error fetching tenants list: '+e.message);
+
+}
+}
+
+document.addEventListener(
+'DOMContentLoaded',
+loadTenantSearchData
+);
+</script>
+
+</body>
+</html>

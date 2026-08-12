@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:15
+    container_name: ledger_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: rent_ledger
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payment_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payment_gateway
+    command: uvicorn app.gateway:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8002:8002"
+
+  web:
+    build: .
+    container_name: rent_ledger_web
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/rent_ledger
+      - GATEWAY_URL=http://payment_gateway:8002/charge
+    depends_on:
+      db:
+        condition: service_healthy
+      payment_gateway:
+        condition: service_started
